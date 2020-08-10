@@ -5,9 +5,9 @@ En esta entrega, se utilizó el poder de las redes neuronales, más específicam
 La red fue entrenada a través de Google Cloud Platform con una tarjeta GPU Tesla T4, con una duración de aproximadamente 7-8 horas. Esta red está encargada de detectar cabezas y personas en sillas de ruedas.
 
 # Instalación 
-Los requisitos para el funcionamiento de del código son los siguientes:
+Se debe generar un ambiente virtual con las siguientes librerías:
 
-- python >=3 
+- Python >=3 
 - Tensorflow 1.14
 - OpenCV
 - Shapely
