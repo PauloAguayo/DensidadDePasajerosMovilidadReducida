@@ -31,7 +31,9 @@ El programa posee 9 variables parser, de las cuales sólo 4 son obligatorias. Se
 - '-mode' 1: Esta selección va relacionada con las variables parser '-wr', y '-ws', opcionalmente.
 - '-mode' 2: En esta elección se preguntará por el área del polígono, a modo de obtener su valor ground truth. La métrica de este valor debe ser en metros. En este modo, las variables '-wr' y '-ws' no son útiles, es decir, no son consideradas en los cálculo.
 
-En ambos modos se pueden encontrar las opciones de detecciones y remociones manuales, y ajuste en la detección espacial de silla de ruedas (en forma de loop para ajustar de manera iterativa y cómoda); las que serán preguntadas a través de la pantalla de comando (cmd o prompt). El programa reconoce confirmaciones a través de la tecla "y" (minúscula), en caso contrario no ingresará a dicha opción y continuará en el procesamiento.
+En ambos modos será necesario seleccionar el polígono de medición en la imagen. Este tratamiento se ejecuta seleccionando con doble click un punto en la imagen, para luego presionar la tecla "a". Si no se presiona dicha tecla, el punto seleccionado no será guardado. Esta mecánica debe ejecutarse en la elección de cada punto. La recopilación de puntos debe ser de manera secuencial. Para finalizar con el proceso debe presionarse la teclas "esc".
+
+En ambos modos se pueden encontrar las opciones de detecciones y remociones manuales, y ajuste en la detección espacial de silla de ruedas (en forma de loop para ajustar de manera iterativa y cómoda); las que serán preguntadas a través de la pantalla de comando (cmd o prompt). El programa reconoce confirmaciones a través de la tecla "y" (minúscula), en caso contrario no ingresará a dicha opción y continuará en el procesamiento. Estas selecciones son opcionales.
 
 En el caso de detecciones y remociones manuales, en la pantalla de comando se realiza la pregunta "HANDCRAFTED DETECTIONS?". Esta sección funciona con los siguientes 3 comandos:
 - Detección de cabeza: En la imagen dispuesta es necesario selecionar el área de interés, para luego presionar la tecla "a". En el caso de no presionar la tecla, no quedará registrado en el sistema.
