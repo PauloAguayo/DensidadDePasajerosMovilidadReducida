@@ -243,7 +243,7 @@ while(input1=='y'):
         for c,x in enumerate(boxes):
             bb_gt = [x[1],x[0],x[3],x[2]]
             bb_remove = [ix/image.shape[1],iy/image.shape[0],xx/image.shape[1],yy/image.shape[0]]
-            if iou(bb_remove,bb_gt)>0.7:
+            if iou(bb_remove,bb_gt)>0.5:
                 classes[c]=3.0
 cv2.destroyAllWindows()
 
