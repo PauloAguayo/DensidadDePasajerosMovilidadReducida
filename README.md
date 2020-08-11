@@ -52,3 +52,5 @@ $ python Object_detection_image.py -i frames1_0000000069.png -m inference_graph/
 - https://github.com/tensorflow/models
 - https://github.com/ZidanMusk/experimenting-with-sort
 - https://github.com/tzutalin/labelImg
+- https://ffmpeg.org/
+- https://obsproject.com/
