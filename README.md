@@ -29,7 +29,18 @@ El programa posee 9 variables parser, de las cuales sólo 4 son obligatorias. Se
 
 # Usos
 - '-mode' 1: Esta selección va relacionada con las variables parser '-wr', y '-ws', opcionalmente.
-- '-mode' 2: En esta elección se preguntará por el área del polígono, a modo de obtener su valor ground truth. En este modo, las variables '-wr' y '-ws' no son útiles, es decir, no son consideradas en ningún cálculo.
+- '-mode' 2: En esta elección se preguntará por el área del polígono, a modo de obtener su valor ground truth. La métrica de este valor debe ser en metros. En este modo, las variables '-wr' y '-ws' no son útiles, es decir, no son consideradas en los cálculo.
+
+En ambos modos se pueden encontrar las opciones de detecciones y remociones manuales, y ajuste en la detección espacial de silla de ruedas (en forma de loop para ajustar de manera iterativa y cómoda); las que serán preguntadas a través de la pantalla de comando (cmd o prompt). El programa reconoce confirmaciones a través de la tecla "y" (minúscula), en caso contrario no ingresará a dicha opción y continuará en el procesamiento.
+
+En el caso de detecciones y remociones manuales, en la pantalla de comando se realiza la pregunta "HANDCRAFTED DETECTIONS?". Esta sección funciona con los siguientes 3 comandos:
+- Detección de cabeza: En la imagen dispuesta es necesario selecionar el área de interés, para luego presionar la tecla "a". En el caso de no presionar la tecla, no quedará registrado en el sistema.
+- Detección de silla de ruedas: Análogo al caso anterior, pero en este proceso se debe presionar la tecla "q". Es necesario mencionar que el programa soporta sólo una detección de silla de ruedas, ya sea manual o por red.
+- Remoción de detección: Esta opción puede remover incluso detecciones efectuadas por la red, es decir, falsos positivos. Para realizar esta acción se ejecuta el proceso idéntico a los anteriores, para finalmente presionar la tecla "z".
+
+Se pueden realizar múltiples detecciones y remociones.
+
+Para el proceso de ajuste en la detección espacial de silla de ruedas, se realizará la pregunta "WHEELCHAIR AREA CORRECTION?". La confirmación a la pregunta recaerá sobre una segunda interrogante, "CORRECTION VALUE? (PERCENTAGE)", en la cual será necesario responder sólo con el valor de corrección en porcentaje, por ejemplo 0.25, que corresponde a una disminución de un 25% en el tamaño de la caja de detección dibujada en la imagen. Para la excepción de querer agrandar la caja, será necesario ingresar valores de 2 en adelante, por ejemplo 2.1, en el caso de querer agrandar en un 10%.
 
 # Ejemplo
 $ python Object_detection_image.py -i frames1_0000000069.png -m inference_graph/frozen_inference_graph.pb -l training/labelmap.pbtxt -mode 1
