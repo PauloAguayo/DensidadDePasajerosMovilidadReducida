@@ -24,6 +24,3 @@ class Measurements(object):
 
     def PolyArea(self,x,y):  # shoelace formula
         return (0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1))))
-
-#    def exp_weight(self,height,width,centroid):
-#        self.min_length = np.minimum(height,width)

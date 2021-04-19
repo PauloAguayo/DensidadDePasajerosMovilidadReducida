@@ -4,8 +4,8 @@ import tensorflow as tf
 from shapely import geometry
 import argparse
 from measurements import Measurements
-from utils import label_map_util
-from utils import visualization_utils as vis_util
+from object_detection.utils import label_map_util
+from object_detection.utils import visualization_utils as vis_util
 from draw import Drawing
 from outcomes import Outcomes
 from calibrate import Calibration
@@ -182,7 +182,7 @@ if input1=='y':
 detections_2 = draws.Draw_detections(0,1,camera_height,people_height)
 
 people = int(detections_2[1])
-
+draws.Voronoi_diagram(image)
 cv2.imshow('Image',image)
 cv2.waitKey(0)
 cv2.destroyAllWindows()

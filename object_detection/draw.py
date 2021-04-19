@@ -1,9 +1,10 @@
 import cv2
 from measurements import Measurements
 import numpy as np
-from utils import visualization_utils as vis_util
-from shapely import geometry
+from object_detection.utils import visualization_utils as vis_util
+from shapely import geometry, ops
 from scipy.spatial import Voronoi
+from matplotlib import pyplot as plt
 
 class Drawing(object):
     def __init__(self,mode,image,copy_image,final_image,min_score,angle):
@@ -20,7 +21,6 @@ class Drawing(object):
         self.copy = self.image.copy()
         self.origin = np.array([0,0])
         self.angle = angle
-        self.borders = []
 
     def Prepare_data(self,scores,boxes,classes):
         self.scores = scores
@@ -106,7 +106,7 @@ class Drawing(object):
             if self.poly.contains(geom_coords):
                 self.rec_points.append([int(coords[0]),int(coords[1])])
                 vis_util.draw_bounding_box_on_image_array(photo,caja[0],caja[1],caja[2],caja[3],color='red',thickness=4,display_str_list=()) # HEADS
-                #cv2.circle(photo,(int(coords[1]),int(coords[0])),8,(255,0,0),3)
+                cv2.circle(photo,(int(coords[1]),int(coords[0])),1,(255,0,0),-1)
                 return(1)
             elif clase==4.0:
                 vis_util.draw_bounding_box_on_image_array(photo,caja[0],caja[1],caja[2],caja[3],color='red',thickness=4,display_str_list=()) # HEADS
@@ -186,25 +186,8 @@ class Drawing(object):
         self.centroid = np.array(list(poly.centroid.coords)[0]) # x,y
         self.image_bottom[1] = self.centroid[0]
 
-        x_plus = self.image_center[1]*0.15
-        y_plus = self.image_center[0]*0.15
-        bigger_points = []
-        for point in points:
-            if point[0]<=self.centroid[0] and point[1]<=self.centroid[1]: # 2nd quadrant
-                #bigger_points.append([int(point[0] - x_plus),int(point[1] - y_plus)])
-                bigger_points.append([int(point[0]),int(point[1])])
-            elif point[0]<=self.centroid[0] and point[1]>self.centroid[1]: # 3rd quadrant
-                bigger_points.append([int(point[0] - x_plus),int(point[1] + y_plus)])
-            elif point[0]>self.centroid[0] and point[1]>self.centroid[1]: # 4th quadrant
-                bigger_points.append([int(point[0] + x_plus),int(point[1] + y_plus)])
-            else:                                               # 1st quadrant
-                #bigger_points.append([int(point[0] + x_plus),int(point[1] - y_plus)])
-                bigger_points.append([int(point[0]),int(point[1])])
-        self.poly = geometry.Polygon(bigger_points)
-
-        self.borders = np.array(points)
+        self.poly = geometry.Polygon(points)
         return(points)
-        #return(bigger_points)
 
     def Handcrafted(self,dec):
         self.drawing = False # True if mouse is pressed
@@ -280,22 +263,87 @@ class Drawing(object):
         scr = np.array(scr)
         self.scores = np.concatenate((self.scores,scr))
 
-    def Voronoi_diagram(self):
+    def Voronoi_diagram(self,image):
+        rec_points = np.array(self.rec_points)
+        vor = Voronoi(np.flip(rec_points))
+        lines = [geometry.LineString(vor.vertices[line]) for line in vor.ridge_vertices if -1 not in line]
+        for polyp in ops.polygonize(lines):
+            poly = np.array(list(polyp.exterior.coords))
+
         sides = []
-        for uno,dos in zip(self.borders,np.concatenate((self.borders[1:],self.borders[0]))):
-            x_axis = np.arange(uno[0],dos[0]+1)
-            y_axis = np.arange(uno[1],dos[1]+1)
+        for p_inicial,p_final in zip(poly[:-1],poly[1:]):   #x,y
+            if p_final[1]>=p_inicial[1]:
+                y_axis = np.arange(p_inicial[1],p_final[1]+1)
+            else:
+                y_axis = np.arange(p_final[1],p_inicial[1]+1)
+                y_axis = y_axis[::-1]
+            if p_final[0]>=p_inicial[0]:
+                x_axis = np.arange(p_inicial[0],p_final[0]+1)
+            else:
+                x_axis = np.arange(p_final[0],p_inicial[0]+1)
+                x_axis = x_axis[::-1]
+
+            slope = (p_final[1]-p_inicial[1])/(p_final[0]-p_inicial[0])
+
             if len(x_axis) >= len(y_axis):
                 y_axis = []
                 for x in x_axis:
-                slope*(x__-x)+y
-            sides.append([y_axis,x_axis])
+                    y_axis.append((-1)*(slope*(p_final[0]-x)-p_final[1]))
+            else:
+                x_axis = []
+                for y in y_axis:
+                    x_axis.append((-1)*((p_final[1]-y)/slope-p_final[0]))
+            sides.append(np.array([y_axis,x_axis]))
 
-        if len(self.rec_points)>1:
+        center = rec_points.mean(axis=0)
+        #center = np.flip(rec_points,(0,2)).mean(axis=0)
+        for pointidx, simplex in zip(vor.ridge_points, vor.ridge_vertices):
+            simplex = np.asarray(simplex)
+            if np.any(simplex < 0):
+                i = simplex[simplex >= 0][0] # finite end Voronoi vertex
+                t = rec_points[pointidx[1]] - rec_points[pointidx[0]]  # tangent
+                t = t / np.linalg.norm(t)
+                n = np.array([-t[1], t[0]]) # normal
+                midpoint = rec_points[pointidx].mean(axis=0)
+                p_f = vor.vertices[i] + np.sign(np.dot(midpoint - center, n)) * n * 10000
+                p_i = np.array([int(vor.vertices[i,0]),int(vor.vertices[i,1])])  # x,y
 
-            for i in self.rec_points:
+                zides = []
+                if p_f[1]>=p_i[1]:
+                    y_axis = np.arange(p_i[1],p_f[1]+1)
+                else:
+                    y_axis = np.arange(p_f[1],p_i[1]+1)
+                    y_axis = y_axis[::-1]
+                if p_f[0]>=p_i[0]:
+                    x_axis = np.arange(p_i[0],p_f[0]+1)
+                else:
+                    x_axis = np.arange(p_f[0],p_i[0]+1)
+                    x_axis = x_axis[::-1]
 
-        elif len(self.rec_points)==1:
+                zlope = (p_f[1]-p_i[1])/(p_f[0]-p_i[0])
 
-        else:
-            print('error')
+                if len(x_axis) >= len(y_axis):
+                    y_axis = []
+                    for x in x_axis:
+                        y_axis.append((-1)*(zlope*(p_f[0]-x)-p_f[1]))
+                else:
+                    x_axis = []
+                    for y in y_axis:
+                        x_axis.append((-1)*((p_f[1]-y)/zlope-p_f[0]))
+                zides.append(np.array([y_axis,x_axis]))
+
+                for vorder in zides:
+                    for y,x in np.transpose(vorder):
+                        pnt = geometry.Point([x,y])
+                        if self.poly.contains(pnt):
+                            cv2.circle(image,(int(x),int(y)),1,(0,255,255),-1)
+
+        for border in sides:
+            for y,x in np.transpose(border):
+                pnt = geometry.Point([x,y])
+                if self.poly.contains(pnt):
+                    cv2.circle(image,(int(x),int(y)),1,(0,255,255),-1)
+
+        cv2.imshow('Area selection',image)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()

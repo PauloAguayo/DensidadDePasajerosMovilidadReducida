@@ -1,3 +1,4 @@
-k = [0,1,2,3,4,5,6]
-for i in k[:-1]:
-	print(i)	
+import numpy as np
+
+print(np.linalg.norm(np.array([867,468])-np.array([859,401])))
+print(np.linalg.norm(np.array([802,305])-np.array([859,401])))
