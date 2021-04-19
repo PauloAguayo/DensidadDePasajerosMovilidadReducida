@@ -106,10 +106,7 @@ class Drawing(object):
             if self.poly.contains(geom_coords):
                 self.rec_points.append([int(coords[0]),int(coords[1])])
                 vis_util.draw_bounding_box_on_image_array(photo,caja[0],caja[1],caja[2],caja[3],color='red',thickness=4,display_str_list=()) # HEADS
-                cv2.circle(photo,(int(coords[1]),int(coords[0])),1,(255,0,0),-1)
-                return(1)
-            elif clase==4.0:
-                vis_util.draw_bounding_box_on_image_array(photo,caja[0],caja[1],caja[2],caja[3],color='red',thickness=4,display_str_list=()) # HEADS
+                #cv2.circle(photo,(int(coords[1]),int(coords[0])),3,(255,0,0),-1)
                 return(1)
             return(0)
 
@@ -265,7 +262,8 @@ class Drawing(object):
 
     def Voronoi_diagram(self,image):
         rec_points = np.array(self.rec_points)
-        vor = Voronoi(np.flip(rec_points))
+        rec_points = np.flip(rec_points)
+        vor = Voronoi(rec_points)
         lines = [geometry.LineString(vor.vertices[line]) for line in vor.ridge_vertices if -1 not in line]
         for polyp in ops.polygonize(lines):
             poly = np.array(list(polyp.exterior.coords))
@@ -296,7 +294,6 @@ class Drawing(object):
             sides.append(np.array([y_axis,x_axis]))
 
         center = rec_points.mean(axis=0)
-        #center = np.flip(rec_points,(0,2)).mean(axis=0)
         for pointidx, simplex in zip(vor.ridge_points, vor.ridge_vertices):
             simplex = np.asarray(simplex)
             if np.any(simplex < 0):
