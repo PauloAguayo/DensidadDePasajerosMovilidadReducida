@@ -2,9 +2,10 @@ import cv2
 from measurements import Measurements
 import numpy as np
 from object_detection.utils import visualization_utils as vis_util
-from shapely import geometry, ops
-from scipy.spatial import Voronoi
-from matplotlib import pyplot as plt
+from shapely import geometry
+from scipy.spatial import Voronoi, ConvexHull
+import pandas as pd
+
 
 class Drawing(object):
     def __init__(self,mode,image,copy_image,final_image,min_score,angle):
@@ -26,11 +27,10 @@ class Drawing(object):
         self.scores = scores
         self.boxes = boxes
         self.classes = classes
-        self.rec_points = []
 
     def Draw_detections(self,input1,n,H,h):
         print("------ DRAWING DETECTIONS AND OPTIMIZING PROJECTIONS ------")
-        print(len(self.scores))
+        self.rec_points = []
         def Quadrant(y,x,beta,slope,photo,d,caja,clase): # (y,x) centroid detection box
 
             # normalized coordinates
@@ -50,7 +50,7 @@ class Drawing(object):
                 if d==0:
                     x_axis = np.arange(x,self.image_bottom[1]+1)                            #    2  |  1
                     if abs(slope) >1: slope = (-1)*(abs(slope) - abs(int(slope)))           #  _____|_____
-                else:                                                                       #   3   |  4      quadrants
+                else:                                                                       #    3  |  4      quadrants
                     x_axis = np.arange(self.image_bottom[0],y+1)                            #       |
                     x_axis = x_axis[::-1]
                     if abs(slope)<1: slope-=1
@@ -101,12 +101,13 @@ class Drawing(object):
                         else:
                             coords = [x_p,y_p]
             # coords y,x
-            #cv2.circle(photo,(int(coords[1]),int(coords[0])),8,(255,0,0),3)
+            #cv2.circle(photo,(int(coords[1]),int(coords[0])),3,(255,0,0),-1)
             geom_coords = geometry.Point([coords[1],coords[0]])
             if self.poly.contains(geom_coords):
                 self.rec_points.append([int(coords[0]),int(coords[1])])
                 vis_util.draw_bounding_box_on_image_array(photo,caja[0],caja[1],caja[2],caja[3],color='red',thickness=4,display_str_list=()) # HEADS
                 #cv2.circle(photo,(int(coords[1]),int(coords[0])),3,(255,0,0),-1)
+                #cv2.putText(photo, str(self.zones), (int(coords[1]-10),int(coords[0]+10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1, cv2.LINE_AA)
                 return(1)
             return(0)
 
@@ -183,6 +184,61 @@ class Drawing(object):
         self.centroid = np.array(list(poly.centroid.coords)[0]) # x,y
         self.image_bottom[1] = self.centroid[0]
 
+        self.poly_points = []
+        for c,(mx,my) in enumerate(points):
+            if c!=0:
+                mx_prev = points[c-1][0]
+                my_prev = points[c-1][1]
+
+                if my>=my_prev:
+                    y_axis = np.arange(my_prev,my+1)
+                else:
+                    y_axis = np.arange(my,my_prev+1)
+                    y_axis = y_axis[::-1]
+
+                if mx>=mx_prev:
+                    x_axis = np.arange(mx_prev,mx+1)
+                else:
+                    x_axis = np.arange(mx,mx_prev+1)
+                    x_axis = x_axis[::-1]
+
+                slope = (my-my_prev)/(mx-mx_prev)
+
+                if len(x_axis) >= len(y_axis):
+                    y_axis = []
+                    for x in x_axis:
+                        self.poly_points.append([round(x),round((-1)*(slope*(mx-x)-my))])
+                else:
+                    x_axis = []
+                    for y in y_axis:
+                        self.poly_points.append([round((-1)*((my-y)/slope-mx)),round(y)])
+            if c==len(points)-1:
+                mx_post = points[0][0]
+                my_post = points[0][1]
+
+                if my_post>=my:
+                    y_axis = np.arange(my,my_post+1)
+                else:
+                    y_axis = np.arange(my_post,my+1)
+                    y_axis = y_axis[::-1]
+
+                if mx_post>=mx:
+                    x_axis = np.arange(mx,mx_post+1)
+                else:
+                    x_axis = np.arange(mx_post,mx+1)
+                    x_axis = x_axis[::-1]
+
+                slope = (my_post-my)/(mx_post-mx)
+
+                if len(x_axis) >= len(y_axis):
+                    y_axis = []
+                    for x in x_axis:
+                        self.poly_points.append([round(x),round((-1)*(slope*(mx_post-x)-my_post))])
+                else:
+                    x_axis = []
+                    for y in y_axis:
+                        self.poly_points.append([round((-1)*((my_post-y)/slope-mx_post)),round(y)])
+
         self.poly = geometry.Polygon(points)
         return(points)
 
@@ -253,59 +309,84 @@ class Drawing(object):
                         cv2.putText(self.copy_image, text, (self.ix , self.iy-5), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 255), 1)
                         self.classes[c]=3.0
         cv2.destroyAllWindows()
-        bx = np.array(bx)
-        self.boxes = np.concatenate((self.boxes,bx))
-        clss = np.array(clss)
-        self.classes = np.concatenate((self.classes,clss))
-        scr = np.array(scr)
-        self.scores = np.concatenate((self.scores,scr))
+        try:
+            bx = np.array(bx)
+            self.boxes = np.concatenate((self.boxes,bx))
+            clss = np.array(clss)
+            self.classes = np.concatenate((self.classes,clss))
+            scr = np.array(scr)
+            self.scores = np.concatenate((self.scores,scr))
+        except:
+            self.scores = self.scores
+            self.classes = self.classes
+            self.boxes = self.boxes
 
     def Voronoi_diagram(self,image):
-        rec_points = np.array(self.rec_points)
+        rec_points = np.array(self.rec_points)   # proyecciones
         rec_points = np.flip(rec_points)
         vor = Voronoi(rec_points)
-        lines = [geometry.LineString(vor.vertices[line]) for line in vor.ridge_vertices if -1 not in line]
-        for polyp in ops.polygonize(lines):
-            poly = np.array(list(polyp.exterior.coords))
 
-        sides = []
-        for p_inicial,p_final in zip(poly[:-1],poly[1:]):   #x,y
-            if p_final[1]>=p_inicial[1]:
-                y_axis = np.arange(p_inicial[1],p_final[1]+1)
-            else:
-                y_axis = np.arange(p_final[1],p_inicial[1]+1)
-                y_axis = y_axis[::-1]
-            if p_final[0]>=p_inicial[0]:
-                x_axis = np.arange(p_inicial[0],p_final[0]+1)
-            else:
-                x_axis = np.arange(p_final[0],p_inicial[0]+1)
-                x_axis = x_axis[::-1]
+        verg = []
+        finite_ridges = []
+        finite_points = []
+        for simplex in vor.ridge_vertices:
+            simplex = np.asarray(simplex)
+            if np.all(simplex >= 0):
+                finite_ridges.append(simplex)
+                x_s = vor.vertices[simplex, 0]
+                y_s = vor.vertices[simplex, 1]
 
-            slope = (p_final[1]-p_inicial[1])/(p_final[0]-p_inicial[0])
+                if y_s[1]>=y_s[0]:
+                    y_axis = np.arange(y_s[0],y_s[1]+1)
+                else:
+                    y_axis = np.arange(y_s[1],y_s[0]+1)
+                    y_axis = y_axis[::-1]
 
-            if len(x_axis) >= len(y_axis):
-                y_axis = []
-                for x in x_axis:
-                    y_axis.append((-1)*(slope*(p_final[0]-x)-p_final[1]))
-            else:
-                x_axis = []
-                for y in y_axis:
-                    x_axis.append((-1)*((p_final[1]-y)/slope-p_final[0]))
-            sides.append(np.array([y_axis,x_axis]))
+                if x_s[1]>=x_s[0]:
+                    x_axis = np.arange(x_s[0],x_s[1]+1)
+                else:
+                    x_axis = np.arange(x_s[1],x_s[0]+1)
+                    x_axis = x_axis[::-1]
+
+                slope = (y_s[1]-y_s[0])/(x_s[1]-x_s[0])
+
+                if len(x_axis) >= len(y_axis):
+                    y_axis = []
+                    for x in x_axis:
+                        y_axis.append((-1)*(slope*(x_s[1]-x)-y_s[1]))
+                else:
+                    x_axis = []
+                    for y in y_axis:
+                        x_axis.append((-1)*((y_s[1]-y)/slope-x_s[1]))
+
+                fin = []
+                for y,x in np.transpose(np.array([y_axis,x_axis])):
+                    pnt = geometry.Point([x,y])
+                    if self.poly.contains(pnt):
+                        verg.append([round(x_s[0]),round(y_s[0]),round(x),round(y)])
+                        verg.append([round(x_s[1]),round(y_s[1]),round(x),round(y)])
+                        cv2.circle(image,(round(x),round(y)),1,(0,255,255),-1)
+                        fin.append([round(x),round(y)])
+                finite_points.append(fin)
 
         center = rec_points.mean(axis=0)
+        print(vor.vertices)
+        print(vor.ridge_vertices)
+        print(vor.regions)
+        infinite_ridges = []
+        infinite_points = []
         for pointidx, simplex in zip(vor.ridge_points, vor.ridge_vertices):
             simplex = np.asarray(simplex)
             if np.any(simplex < 0):
+                infinite_ridges.append(simplex)
                 i = simplex[simplex >= 0][0] # finite end Voronoi vertex
                 t = rec_points[pointidx[1]] - rec_points[pointidx[0]]  # tangent
                 t = t / np.linalg.norm(t)
                 n = np.array([-t[1], t[0]]) # normal
                 midpoint = rec_points[pointidx].mean(axis=0)
-                p_f = vor.vertices[i] + np.sign(np.dot(midpoint - center, n)) * n * 10000
-                p_i = np.array([int(vor.vertices[i,0]),int(vor.vertices[i,1])])  # x,y
+                p_f = vor.vertices[i] + np.sign(np.dot(midpoint - center, n)) * n * 1000
+                p_i = np.array([round(vor.vertices[i,0]),round(vor.vertices[i,1])])  # x,y     # vertices infinitos de voronoi
 
-                zides = []
                 if p_f[1]>=p_i[1]:
                     y_axis = np.arange(p_i[1],p_f[1]+1)
                 else:
@@ -327,19 +408,82 @@ class Drawing(object):
                     x_axis = []
                     for y in y_axis:
                         x_axis.append((-1)*((p_f[1]-y)/zlope-p_f[0]))
-                zides.append(np.array([y_axis,x_axis]))
 
-                for vorder in zides:
-                    for y,x in np.transpose(vorder):
-                        pnt = geometry.Point([x,y])
-                        if self.poly.contains(pnt):
-                            cv2.circle(image,(int(x),int(y)),1,(0,255,255),-1)
+                inf = []
+                for y,x in np.transpose(np.array([y_axis,x_axis])):
+                    pnt = geometry.Point([x,y])
+                    if self.poly.contains(pnt):
+                        verg.append([round(p_i[0]),round(p_i[1]),round(x),round(y)])
+                        verg.append([round(p_f[0]),round(p_f[1]),round(x),round(y)])
+                        cv2.circle(image,(round(x),round(y)),1,(0,0,255),-1)
+                        inf.append([round(x),round(y)])
+                infinite_points.append(inf)
 
-        for border in sides:
-            for y,x in np.transpose(border):
-                pnt = geometry.Point([x,y])
-                if self.poly.contains(pnt):
-                    cv2.circle(image,(int(x),int(y)),1,(0,255,255),-1)
+        cv2.imshow('Area selection',image)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+        verg = np.array(verg)
+        pd_verg = pd.DataFrame(verg,columns=['x_original','y_original','x_recta','y_recta'])
+        pd_verg.to_csv('ggg.csv')
+        regions = vor.regions
+        polygons = []
+        for r in regions:
+            r = np.array(r)
+            pp = []
+            if len(r)!=0:
+                pp = []
+                if np.all(r >= 0):
+                    continue
+                    # for c,(ridge_1,ridge_2) in enumerate(finite_ridges):
+                    #     if (ridge_1 in r) and (ridge_2 in r):
+                    #         for kj in finite_points[c]:
+                    #             pp.append(kj)
+                    # polygons.append(pp)
+
+                else:
+                    for c,(ridge_1,ridge_2) in enumerate(infinite_ridges):
+
+                        if ridge_1==(-1): ridgee = ridge_2
+                        else:   ridgee = ridge_1
+
+                        if ridgee in r:
+                            for kj in infinite_points[c]:
+                                pp.append(kj)
+
+                    for c,(ridge_1,ridge_2) in enumerate(finite_ridges):
+                        if (ridge_1 in r) and (ridge_2 in r):
+                            for kj in finite_points[c]:
+                                pp.append(kj)
+
+
+
+                    polygons.append(pp)
+
+
+
+                    # for k in r:
+                    #     if self.poly.contains(geometry.Point(vor.vertices[k])):
+                    #         pp.append(vor.vertices[k])
+                    #     else:
+                    #         otro_verg = pd_verg.loc[(pd_verg['x_original'] == round(vor.vertices[k,0])) & (pd_verg['y_original'] == round(vor.vertices[k,1]))]
+                    #         if len(otro_verg)!=0:
+                    #             xx_x = 0
+                    #             yy_y = 0
+                    #             otro_verg.to_csv('ggv.csv')
+                    #             if otro_verg['x_original'].iloc[0] == otro_verg['x_recta'].iloc[0]:
+                    #                 xx_x = otro_verg['x_recta'].iloc[-1]
+                    #             else:
+                    #                 xx_x = otro_verg['x_recta'].iloc[0]
+                    #
+                    #             if otro_verg['y_original'].iloc[0] == otro_verg['y_recta'].iloc[0]:
+                    #                 yy_y = otro_verg['y_recta'].iloc[-1]
+                    #             else:
+                    #                 yy_y = otro_verg['y_recta'].iloc[0]
+                    #
+                    #             pp.append([xx_x,yy_y])
+                    #
+                    cv2.fillPoly(image, np.int32([pp]), (255, 255, 255), 8)
 
         cv2.imshow('Area selection',image)
         cv2.waitKey(0)

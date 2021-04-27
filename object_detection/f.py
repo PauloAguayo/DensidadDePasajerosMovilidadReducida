@@ -1,4 +1,5 @@
 import numpy as np
 
-print(np.linalg.norm(np.array([867,468])-np.array([859,401])))
-print(np.linalg.norm(np.array([802,305])-np.array([859,401])))
+n = np.arange(100,1000+1)
+if np.all(200 in n):
+    print(True)
