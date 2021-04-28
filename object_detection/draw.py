@@ -106,7 +106,7 @@ class Drawing(object):
             if self.poly.contains(geom_coords):
                 self.rec_points.append([int(coords[0]),int(coords[1])])
                 vis_util.draw_bounding_box_on_image_array(photo,caja[0],caja[1],caja[2],caja[3],color='red',thickness=4,display_str_list=()) # HEADS
-                #cv2.circle(photo,(int(coords[1]),int(coords[0])),3,(255,0,0),-1)
+                cv2.circle(photo,(int(coords[1]),int(coords[0])),3,(255,0,0),-1)
                 #cv2.putText(photo, str(self.zones), (int(coords[1]-10),int(coords[0]+10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1, cv2.LINE_AA)
                 return(1)
             return(0)
@@ -180,8 +180,22 @@ class Drawing(object):
                 point_counter = 0
         cv2.destroyAllWindows()
 
-        poly = geometry.Polygon(points)
-        self.centroid = np.array(list(poly.centroid.coords)[0]) # x,y
+        self.poly = geometry.Polygon(points)
+        self.centroid = np.array(list(self.poly.centroid.coords)[0]) # x,y
+
+        extended_points = []
+        for punto in points:
+            if (punto[0] <= self.centroid[0]) and (punto[1] <= self.centroid[1]):
+                extended_points.append([punto[0]-1,punto[1]-1])
+            elif (punto[0] <= self.centroid[0]) and (punto[1] > self.centroid[1]):
+                extended_points.append([punto[0]-1,punto[1]+1])
+            elif (punto[0] > self.centroid[0]) and (punto[1] <= self.centroid[1]):
+                extended_points.append([punto[0]+1,punto[1]-1])
+            elif (punto[0] > self.centroid[0]) and (punto[1] > self.centroid[1]):
+                extended_points.append([punto[0]+1,punto[1]+1])
+
+        self.poly_extended = geometry.Polygon(extended_points)
+
         self.image_bottom[1] = self.centroid[0]
 
         self.poly_points = []
@@ -212,6 +226,7 @@ class Drawing(object):
                     x_axis = []
                     for y in y_axis:
                         self.poly_points.append([round((-1)*((my-y)/slope-mx)),round(y)])
+
             if c==len(points)-1:
                 mx_post = points[0][0]
                 my_post = points[0][1]
@@ -239,7 +254,7 @@ class Drawing(object):
                     for y in y_axis:
                         self.poly_points.append([round((-1)*((my_post-y)/slope-mx_post)),round(y)])
 
-        self.poly = geometry.Polygon(points)
+        self.poly_points = self.poly_points[:-1]
         return(points)
 
     def Handcrafted(self,dec):
@@ -325,13 +340,14 @@ class Drawing(object):
         rec_points = np.array(self.rec_points)   # proyecciones
         rec_points = np.flip(rec_points)
         vor = Voronoi(rec_points)
+        polygon_number = 0
 
-        verg = []
         finite_ridges = []
         finite_points = []
         for simplex in vor.ridge_vertices:
             simplex = np.asarray(simplex)
             if np.all(simplex >= 0):
+
                 finite_ridges.append(simplex)
                 x_s = vor.vertices[simplex, 0]
                 y_s = vor.vertices[simplex, 1]
@@ -361,18 +377,13 @@ class Drawing(object):
 
                 fin = []
                 for y,x in np.transpose(np.array([y_axis,x_axis])):
-                    pnt = geometry.Point([x,y])
-                    if self.poly.contains(pnt):
-                        verg.append([round(x_s[0]),round(y_s[0]),round(x),round(y)])
-                        verg.append([round(x_s[1]),round(y_s[1]),round(x),round(y)])
+                    pnt = geometry.Point([round(x),round(y)])
+                    if self.poly_extended.contains(pnt):
                         cv2.circle(image,(round(x),round(y)),1,(0,255,255),-1)
                         fin.append([round(x),round(y)])
                 finite_points.append(fin)
 
         center = rec_points.mean(axis=0)
-        print(vor.vertices)
-        print(vor.ridge_vertices)
-        print(vor.regions)
         infinite_ridges = []
         infinite_points = []
         for pointidx, simplex in zip(vor.ridge_points, vor.ridge_vertices):
@@ -411,11 +422,9 @@ class Drawing(object):
 
                 inf = []
                 for y,x in np.transpose(np.array([y_axis,x_axis])):
-                    pnt = geometry.Point([x,y])
-                    if self.poly.contains(pnt):
-                        verg.append([round(p_i[0]),round(p_i[1]),round(x),round(y)])
-                        verg.append([round(p_f[0]),round(p_f[1]),round(x),round(y)])
-                        cv2.circle(image,(round(x),round(y)),1,(0,0,255),-1)
+                    pnt = geometry.Point([round(x),round(y)])
+                    if self.poly_extended.contains(pnt):
+                        cv2.circle(image,(round(x),round(y)),1,(0,255,255),-1)
                         inf.append([round(x),round(y)])
                 infinite_points.append(inf)
 
@@ -423,68 +432,88 @@ class Drawing(object):
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
-        verg = np.array(verg)
-        pd_verg = pd.DataFrame(verg,columns=['x_original','y_original','x_recta','y_recta'])
-        pd_verg.to_csv('ggg.csv')
         regions = vor.regions
         polygons = []
+        polygon_area = 0
         for r in regions:
             r = np.array(r)
             pp = []
             if len(r)!=0:
                 pp = []
                 if np.all(r >= 0):
-                    continue
-                    # for c,(ridge_1,ridge_2) in enumerate(finite_ridges):
-                    #     if (ridge_1 in r) and (ridge_2 in r):
-                    #         for kj in finite_points[c]:
-                    #             pp.append(kj)
-                    # polygons.append(pp)
-
+                    for c,(ridge_1,ridge_2) in enumerate(finite_ridges):
+                        if (ridge_1 in r) and (ridge_2 in r):
+                            for kj in finite_points[c]:
+                               pp.append(kj)
                 else:
                     for c,(ridge_1,ridge_2) in enumerate(infinite_ridges):
 
-                        if ridge_1==(-1): ridgee = ridge_2
+                        if ridge_1<0: ridgee = ridge_2
                         else:   ridgee = ridge_1
 
                         if ridgee in r:
                             for kj in infinite_points[c]:
                                 pp.append(kj)
+                                cv2.circle(image,(round(kj[0]),round(kj[1])),1,(0,255,255),-1)
 
                     for c,(ridge_1,ridge_2) in enumerate(finite_ridges):
                         if (ridge_1 in r) and (ridge_2 in r):
                             for kj in finite_points[c]:
                                 pp.append(kj)
+                                cv2.circle(image,(round(kj[0]),round(kj[1])),1,(0,255,255),-1)
 
+                    def str_to(pp):
+                        return([str(kk) for kk in pp])
 
+                    arreglo_c_correct = []
+                    def_points = []
+                    for c,kn in enumerate(self.poly_points):
+                        kn = str(kn)
+                        if kn in str_to(pp):
+                            arreglo_c_correct.append(c)
 
-                    polygons.append(pp)
+                    if len(arreglo_c_correct)>1:
 
+                        for ff,kkk in enumerate(arreglo_c_correct):
+                            if ff!=0:
+                                for i in self.poly_points[arreglo_c_correct[ff-1]:arreglo_c_correct[ff]+1]:
+                                    def_points.append(i)
 
+                        litsa = []
+                        for kg in self.poly_points[arreglo_c_correct[1]:]:
+                            litsa.append(kg)
+                        for kg in self.poly_points[:arreglo_c_correct[0]+1]:
+                            litsa.append(kg)
 
-                    # for k in r:
-                    #     if self.poly.contains(geometry.Point(vor.vertices[k])):
-                    #         pp.append(vor.vertices[k])
-                    #     else:
-                    #         otro_verg = pd_verg.loc[(pd_verg['x_original'] == round(vor.vertices[k,0])) & (pd_verg['y_original'] == round(vor.vertices[k,1]))]
-                    #         if len(otro_verg)!=0:
-                    #             xx_x = 0
-                    #             yy_y = 0
-                    #             otro_verg.to_csv('ggv.csv')
-                    #             if otro_verg['x_original'].iloc[0] == otro_verg['x_recta'].iloc[0]:
-                    #                 xx_x = otro_verg['x_recta'].iloc[-1]
-                    #             else:
-                    #                 xx_x = otro_verg['x_recta'].iloc[0]
-                    #
-                    #             if otro_verg['y_original'].iloc[0] == otro_verg['y_recta'].iloc[0]:
-                    #                 yy_y = otro_verg['y_recta'].iloc[-1]
-                    #             else:
-                    #                 yy_y = otro_verg['y_recta'].iloc[0]
-                    #
-                    #             pp.append([xx_x,yy_y])
-                    #
-                    cv2.fillPoly(image, np.int32([pp]), (255, 255, 255), 8)
+                        if len(litsa)>len(def_points):
+                            for o in def_points:
+                                pp.append(o)
+                                cv2.circle(image,(round(o[0]),round(o[1])),1,(0,255,255),-1)
+                        else:
+                            for o in litsa:
+                                pp.append(o)
+                                cv2.circle(image,(round(o[0]),round(o[1])),1,(0,255,255),-1)
+
+                hull = ConvexHull(pp)
+                for simplex in hull.simplices:
+                    p_x_s = pp[simplex[0]][0]
+                    p_y_s = pp[simplex[0]][1]
+                    p_x_f = pp[simplex[1]][0]
+                    p_y_f = pp[simplex[1]][1]
+
+                    #cv2.line(image,(p_x_s,p_y_s),(p_x_f,p_y_f),(255,0,0),2)
+                cx = np.mean(hull.points[hull.vertices,0])
+                cy = np.mean(hull.points[hull.vertices,1])
+                polygons.append(hull.volume)
+                polygon_area += hull.volume
+                polygon_number+=1
+                cv2.putText(image, str(polygon_number), (round(cx-10),round(cy+10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1, cv2.LINE_AA)
+
+        for c,p in enumerate(polygons):
+            print('Polygon '+str(c+1)+ ' Area = ' + str(self.measures.Area_Voronoi(polygon_area,p,)))
 
         cv2.imshow('Area selection',image)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
+
+        return(polygon_area)

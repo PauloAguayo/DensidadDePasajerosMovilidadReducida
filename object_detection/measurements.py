@@ -24,3 +24,6 @@ class Measurements(object):
 
     def PolyArea(self,x,y):  # shoelace formula
         return (0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1))))
+
+    def Area_Voronoi(self,hull_pol,hull_pol_mini,gt_pol):
+        return(float(gt_pol*hull_pol_mini/hull_pol))

@@ -11,6 +11,7 @@ from outcomes import Outcomes
 from calibrate import Calibration
 import csv
 import os
+from scipy.spatial import ConvexHull
 
 # Parser arguments
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -19,7 +20,7 @@ parser.add_argument("-l", "--labels", required=True, help="path to labels file")
 parser.add_argument("-i", "--input", default=0, type=str, help="path to optional input image file", required=True)
 parser.add_argument("-o", "--output", type=str, default="results/output.jpg", help="path and name to optional output image file")
 parser.add_argument("-c", "--threshold", type=float, default=0.8, help="minimum probability to filter weak detection")
-parser.add_argument("-wr", "--wheelchair_rear", type=float, default=0.8, help="size of wheelchair rear in meters")
+parser.add_argument("-wr", "--wheelchair_rear", type=float, default=0.85, help="size of wheelchair rear in meters")
 parser.add_argument("-ws", "--wheelchair_side", type=float, default=1.2, help="size of wheelchair side in meters")
 parser.add_argument("-t", "--calibration", action="store_true", help="option for un-distort input image")
 parser.add_argument("-r", "--resize", type=str, default="720,1280", help="resize input image")
@@ -155,7 +156,7 @@ print('PEOPLE DETECTED =',detections_1[1])
 
 # Drawing polygon and its centroid
 cv2.circle(copy_image,(int(centroid[0]),int(centroid[1])),6,(0,255,255),-1)
-polygon_area = measures.PolyArea(pts[:,0],pts[:,1])
+#polygon_area = measures.PolyArea(pts[:,0],pts[:,1])
 pts = pts.reshape((-1,1,2))
 cv2.polylines(copy_image,[pts],True,(0,255,255))
 cv2.polylines(image,[pts],True,(0,255,255))
@@ -167,9 +168,9 @@ cv2.destroyAllWindows()
 mode.Extra_dec()
 
 # Some calculations
-people_density = mode.People_density(detections_1[1],polygon_area,detections_1[0])
-print(txt_intro, people_density[1], 'm2')
-print('DENSITY = ', people_density[0], 'people/m2')
+#people_density = mode.People_density(detections_1[1],polygon_area,detections_1[0])
+#print(txt_intro, people_density[1], 'm2')
+#print('DENSITY = ', people_density[0], 'people/m2')
 print('------------------------------------------------------------------------')
 
 # In case detections are incomplete or not perfect, you can make square selections to ensure a better performance
@@ -182,7 +183,7 @@ if input1=='y':
 detections_2 = draws.Draw_detections(0,1,camera_height,people_height)
 
 people = int(detections_2[1])
-draws.Voronoi_diagram(image)
+polygon_area = draws.Voronoi_diagram(image)
 cv2.imshow('Image',image)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
@@ -191,7 +192,7 @@ cv2.destroyAllWindows()
 print('PEOPLE DETECTED =',people)
 people_density = mode.People_density(people,polygon_area,detections_2[0])
 print(txt_intro, people_density[1], 'm2')
-print('DENSITY = ', people_density[0], 'people/m2')
+print('AVERAGE DENSITY = ', people_density[0], 'people/m2')
 print('------------------------------------------------------------------------')
 
 # Loop for bounding box correction for wheelchair detection following the same last procedure for plotting squares
@@ -211,7 +212,7 @@ while(input2=='y'):
     print('PEOPLE DETECTED =',people)
     people_density = mode.People_density(people,polygon_area,detections_3[0]) #(people,polygon_slf,chair_slf)
     print(txt_intro, people_density[1], 'm2')
-    print('DENSITY = ', people_density[0], 'people/m2')
+    print('AVERAGE DENSITY = ', people_density[0], 'people/m2')
     print('--------------------------------------------------------------------')
     iter+=1
     dec = False
